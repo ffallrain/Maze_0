@@ -12,9 +12,38 @@ from collections import defaultdict
 N = 6
 
 
-class Wall(list):
-    def __init__(self, a, b):
-        super().__init__((a, b))
+class Wall(list,mlines.Line2D):
+    def __init__(self, a, b, N = N):
+        list.__init__(self, (a, b))
+        ra,ca = Map.derive_rc(a)
+        rb,cb = Map.derive_rc(b)
+        try:
+            assert ra == rb or ca == cb 
+            assert ra != rb or ca != cb
+        except AssertionError:
+            sys.stderr.write("Not valid wall. Error.")
+            sys.exit()
+        if ra == rb:  # vertical
+            if ca > cb :
+                ca,cb = cb,ca
+                y1 = ra - 0.5
+                y2 = ra + 0.5
+                x1 = ca + 0.5
+                x2 = ca + 0.5
+        elif ca == cb: # horizonal 
+            if ra > rb :
+                ra,rb = rb,ra
+                x1 = ca - 0.5
+                x2 = ca + 0.5
+                y1 = ra + 0.5
+                y2 = ra + 0.5
+        mlines.Line2D.__init__( (x1,y1),(x2,y2),lw = 5 
+        def draw_lines(self, lines, ax, color="grey", lw=5, alpha=0.3, gid=None):
+            for l in lines:
+                x = l[0:2]
+                y = l[2:4]
+                line = mlines.Line2D(x, y, lw=lw, alpha=alpha, color=color, gid=gid)
+        
 
 
 class Walls(list):
@@ -58,6 +87,7 @@ class Target(mpatches.RegularPolygon):
         self.loc = loc
         self.status = "new"
 
+
 class Map:
     def __init__(self, N=N):
         self.graph = defaultdict(list)
@@ -76,7 +106,7 @@ class Map:
         # self.make_distance_matrix()
 
     def derive_rc(self, n):
-        return (n % self.N, n // self.N) 
+        return (n % self.N, n // self.N)
 
     def derive_n(self, a):
         c, r = a
@@ -153,8 +183,8 @@ class Map:
         self.all_stone = all_stone
         self.walker = Walker((0, 0))
         self.goal = Goal((N - 1, N - 1))
-        self.walker_index = 0 
-        self.goal_index = N*N -1 
+        self.walker_index = 0
+        self.goal_index = N * N - 1
         self.all_target_index = all_target_index
         self.all_stone_index = all_stone_index
         return all_target, all_stone
@@ -192,25 +222,36 @@ class Map:
             y = l[2:4]
             line = mlines.Line2D(x, y, lw=lw, alpha=alpha, color=color, gid=gid)
             ax.add_line(line)
-            for i in range(self.N*self.N):
-                ax.annotate("%d"%i , self.derive_rc(i), color='grey', weight='bold', fontsize='xx-large', ha='center', va='center',fontweight='light', zorder = 0 )
+            for i in range(self.N * self.N):
+                ax.annotate(
+                    "%d" % i,
+                    self.derive_rc(i),
+                    color="grey",
+                    weight="bold",
+                    fontsize="xx-large",
+                    ha="center",
+                    va="center",
+                    fontweight="light",
+                    zorder=0,
+                )
 
     def find_solution(self):
         best_path = None
-        best_s = self.N**4
-        for (path,s) in self.sample_all_possible_solution():
-            if s<best_s:
+        best_s = self.N ** 4
+        for (path, s) in self.sample_all_possible_solution():
+            if s < best_s:
                 best_path = path
                 best_s = s
         self.best_path = best_path
         self.best_s = best_s
-    
+
     def sample_all_possible_solution(self):
         from copy import deepcopy as dc
+
         target_index = dc(self.all_target_index)
-        stone_index  = dc(self.all_stone_index)
-        for list_target in Map.permute(target_index,0,len(target_index)-1):
-            for list_stone in Map.permute(stone_index,0,len(stone_index)-1):
+        stone_index = dc(self.all_stone_index)
+        for list_target in Map.permute(target_index, 0, len(target_index) - 1):
+            for list_stone in Map.permute(stone_index, 0, len(stone_index) - 1):
                 path = list()
                 path.append(self.walker_index)
                 for i in range(len(list_target)):
@@ -218,19 +259,22 @@ class Map:
                     path.append(list_target[i])
                 path.append(self.goal_index)
                 s = 0
-                for i in range(len(path)-1):
-                    s += self.dist[path[i]][path[i+1]]
-                yield(path,s)
+                for i in range(len(path) - 1):
+                    s += self.dist[path[i]][path[i + 1]]
+                yield (path, s)
 
     @staticmethod
-    def permute(a,l,r): # https://www.geeksforgeeks.org/write-a-c-program-to-print-all-permutations-of-a-given-string/
-        if l==r:
+    def permute(
+        a, l, r
+    ):  # https://www.geeksforgeeks.org/write-a-c-program-to-print-all-permutations-of-a-given-string/
+        if l == r:
             yield a
         else:
-            for i in range(l,r+1):
+            for i in range(l, r + 1):
                 a[l], a[i] = a[i], a[l]
-                yield from Map.permute(a, l+1, r)
-                a[l], a[i] = a[i], a[l] 
+                yield from Map.permute(a, l + 1, r)
+                a[l], a[i] = a[i], a[l]
+
 
 def test():
     if not os.path.isdir("data"):
