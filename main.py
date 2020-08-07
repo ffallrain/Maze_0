@@ -12,38 +12,52 @@ from collections import defaultdict
 N = 6
 
 
-class Wall(list,mlines.Line2D):
-    def __init__(self, a, b, N = N):
-        list.__init__(self, (a, b))
-        ra,ca = Map.derive_rc(a)
-        rb,cb = Map.derive_rc(b)
+class Wall(mlines.Line2D, tuple):
+    def __new__(tuple,a,b,N=N):
+        return super(Wall,tuple).__new__(tuple,(a,b))
+
+    def __init__(self, a, b, N=N):
+        self.N = N
+        # tuple.__init__(self, (a, b))
+        ra, ca = self.derive_rc(a)
+        rb, cb = self.derive_rc(b)
         try:
-            assert ra == rb or ca == cb 
+            assert ra == rb or ca == cb
             assert ra != rb or ca != cb
         except AssertionError:
             sys.stderr.write("Not valid wall. Error.")
             sys.exit()
-        if ra == rb:  # vertical
-            if ca > cb :
-                ca,cb = cb,ca
-                y1 = ra - 0.5
-                y2 = ra + 0.5
-                x1 = ca + 0.5
-                x2 = ca + 0.5
-        elif ca == cb: # horizonal 
-            if ra > rb :
-                ra,rb = rb,ra
-                x1 = ca - 0.5
-                x2 = ca + 0.5
-                y1 = ra + 0.5
-                y2 = ra + 0.5
-        mlines.Line2D.__init__( (x1,y1),(x2,y2),lw = 5 
-        def draw_lines(self, lines, ax, color="grey", lw=5, alpha=0.3, gid=None):
-            for l in lines:
-                x = l[0:2]
-                y = l[2:4]
-                line = mlines.Line2D(x, y, lw=lw, alpha=alpha, color=color, gid=gid)
-        
+        x1 = 0
+        x2 = 0
+        y1 = 0
+        y2 = 0
+        # print(ra,rb,ca,cb)
+        if ra == rb:  # horizonal
+            # print(True)
+            if ca > cb:
+                ca, cb = cb, ca
+            y1 = ca + 0.5
+            y2 = ca + 0.5
+            x1 = ra - 0.5
+            x2 = ra + 0.5
+        elif ca == cb:  # vertical
+            if ra > rb:
+                ra, rb = rb, ra
+            x1 = ra + 0.5
+            x2 = ra + 0.5
+            y1 = ca - 0.5
+            y2 = ca + 0.5
+        # print(x1,y1,x2,y2)
+        mlines.Line2D.__init__(
+            self, (x1, x2), (y1, y2), lw=7, alpha=1.0, color="black", gid=None
+        )
+
+    def derive_rc(self, n):
+        return (n % self.N, n // self.N)
+
+    def derive_n(self, a):
+        c, r = a
+        return r * self.N + c
 
 
 class Walls(list):
@@ -53,6 +67,7 @@ class Walls(list):
             for line in open(income):
                 a = int(line.split()[0])
                 b = int(line.split()[1])
+                tmp2 = Wall(a, b)
                 tmp.append(Wall(a, b))
         else:
             for (a, b) in income:
@@ -162,6 +177,7 @@ class Map:
     def set_up_walls(self, ws):
         for w in ws:
             self.delEdge(w[0], w[1])
+        self.walls = ws
 
     def generate_condition(self, nsample=None):
         if nsample == None:
@@ -200,6 +216,8 @@ class Map:
             ax.add_patch(target)
         ax.add_patch(self.walker)
         ax.add_patch(self.goal)
+        for w in self.walls:
+            ax.add_line(w)
 
         plt.axis("equal")
         plt.axis("off")
@@ -216,7 +234,7 @@ class Map:
                 l.append([x - 0.5 for x in (0, N, i, i)])
         return l
 
-    def draw_lines(self, lines, ax, color="grey", lw=5, alpha=0.3, gid=None):
+    def draw_lines(self, lines, ax, color="grey", lw=3, alpha=0.2, gid=None):
         for l in lines:
             x = l[0:2]
             y = l[2:4]
@@ -298,7 +316,8 @@ def test():
 
 
 a = Map()
-a.generate_condition(nsample=3)
+a.set_up_walls(Walls("walls"))
+a.generate_condition(nsample=6)
 a.make_distance_matrix()
 a.find_solution()
 print(a.best_path)
